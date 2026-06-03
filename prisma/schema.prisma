@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  OFFICE
+  EMPLOYEE
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  username      String    @unique
+  password      String    // كلمة المرور المشفرة
+  role          Role      @default(EMPLOYEE)
+  
+  // قيود الشبكة (IP Whitelisting) الخاصة بحسابات المكاتب فقط
+  allowedIps    String[]  
+
+  // العلاقات: ربط الموظفين بالمكتب التابعين له
+  officeId      String?
+  office        User?     @relation("OfficeEmployees", fields: [officeId], references: [id])
+  employees     User[]    @relation("OfficeEmployees")
+
+  // العلاقات مع الجداول الأخرى
+  sessions      OfficeSession[]
+  dailyRecords  DailyRecord[]   @relation("OfficeRecords")
+  employeeWorks EmployeeWork[]  @relation("EmployeeWorks")
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([role])
+}
+
+// جدول تتبع وقت العمل للمكاتب
+model OfficeSession {
+  id            String    @id @default(cuid())
+  officeId      String
+  office        User      @relation(fields: [officeId], references: [id], onDelete: Cascade)
+  
+  startTime     DateTime  @default(now())
+  endTime       DateTime? // يتم تسجيله عند تسجيل الخروج
+  durationInMin Int?      // مدة الجلسة بالدقائق (تحسب عند الخروج)
+  
+  date          DateTime  @default(dbgenerated("CURRENT_DATE")) @db.Date // تاريخ الجلسة فقط
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([officeId, date])
+}
+
+// جدول إجمالي الطلبات اليومية لكل مكتب
+model DailyRecord {
+  id            String    @id @default(cuid())
+  officeId      String
+  office        User      @relation("OfficeRecords", fields: [officeId], references: [id], onDelete: Cascade)
+  
+  date          DateTime  @default(dbgenerated("CURRENT_DATE")) @db.Date
+  totalOrders   Int       @default(0) // إجمالي الطلبات اليومية المستلمة
+
+  // الطلبات الموزعة على الموظفين في هذا اليوم
+  employeeWorks EmployeeWork[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // لا يمكن للمكتب إدخال أكثر من سجل واحد لنفس اليوم
+  @@unique([officeId, date]) 
+  @@index([date])
+}
+
+// جدول الطلبات المنجزة للموظفين والدفع
+model EmployeeWork {
+  id            String        @id @default(cuid())
+  
+  dailyRecordId String
+  dailyRecord   DailyRecord   @relation(fields: [dailyRecordId], references: [id], onDelete: Cascade)
+  
+  employeeId    String
+  employee      User          @relation("EmployeeWorks", fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  ordersCount   Int           @default(0) // عدد الطلبات المنجزة للموظف
+  paymentStatus PaymentStatus @default(UNPAID) // حالة الدفع (تُعدل من قبل الأدمن فقط)
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // الموظف له سجل واحد ضمن السجل اليومي للمكتب
+  @@unique([dailyRecordId, employeeId]) 
+  @@index([employeeId])
+  @@index([paymentStatus])
+}
