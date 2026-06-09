@@ -8,24 +8,27 @@ import bcrypt from "bcrypt";
 import { autoCloseStaleSessions } from "@/lib/sessions";
 import { logAction } from "@/lib/audit";
 
-// Helper to get today's date safely (setting time to 00:00:00)
-const getToday = () => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return today;
+// Helper to get target date safely (setting time to 00:00:00)
+const getTargetDate = (dateStr?: string) => {
+  const target = new Date();
+  if (dateStr === "yesterday") {
+    target.setDate(target.getDate() - 1);
+  }
+  target.setHours(0, 0, 0, 0);
+  return target;
 };
 
-export async function getOfficeStats() {
+export async function getOfficeStats(dateStr?: string) {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "OFFICE") throw new Error("Unauthorized");
   
   autoCloseStaleSessions().catch(console.error);
   
-  const today = getToday();
+  const targetDate = getTargetDate(dateStr);
   const officeId = session.user.id;
 
-  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const startOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+  const endOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0);
 
   const [employees, activeSession, monthlySessions, dailyRecordResult] = await Promise.all([
     // 1. Get ALL active Employees for the system
@@ -35,7 +38,7 @@ export async function getOfficeStats() {
     }),
     // 2. Get Active Session if any
     prisma.officeSession.findFirst({
-      where: { officeId, date: today, endTime: null },
+      where: { officeId, date: targetDate, endTime: null },
       orderBy: { startTime: 'desc' }
     }),
     // 3. Calculate Monthly Stats
@@ -47,7 +50,7 @@ export async function getOfficeStats() {
     }),
     // 4. Get Daily Record
     prisma.dailyRecord.findUnique({
-      where: { date: today },
+      where: { date: targetDate },
       include: { employeeWorks: { include: { employee: true } } }
     })
   ]);
@@ -56,7 +59,7 @@ export async function getOfficeStats() {
 
   if (!dailyRecord) {
     dailyRecord = await prisma.dailyRecord.create({
-      data: { date: today, totalOrders: 0 },
+      data: { date: targetDate, totalOrders: 0 },
       include: { employeeWorks: { include: { employee: true } } }
     });
   }
@@ -70,27 +73,27 @@ export async function getOfficeStats() {
   return { dailyRecord, employees, activeSession, monthlyStats };
 }
 
-export async function updateDailyTotal(totalOrders: number) {
+export async function updateDailyTotal(totalOrders: number, dateStr?: string) {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "OFFICE") throw new Error("Unauthorized");
-  const today = getToday();
+  const targetDate = getTargetDate(dateStr);
 
   await prisma.dailyRecord.upsert({
-    where: { date: today },
+    where: { date: targetDate },
     update: { totalOrders },
-    create: { date: today, totalOrders },
+    create: { date: targetDate, totalOrders },
   });
 
   revalidatePath("/office");
 }
 
-export async function assignOrderToEmployee(employeeId: string, count: number) {
+export async function assignOrderToEmployee(employeeId: string, count: number, dateStr?: string) {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "OFFICE") throw new Error("Unauthorized");
-  const today = getToday();
+  const targetDate = getTargetDate(dateStr);
 
   const dailyRecord = await prisma.dailyRecord.findUnique({
-    where: { date: today }
+    where: { date: targetDate }
   });
 
   if (!dailyRecord) throw new Error("Daily record not found");

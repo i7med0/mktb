@@ -4,14 +4,17 @@ import { redirect } from "next/navigation";
 import { getOfficeStats } from "./actions";
 import OfficeDashboardClient from "./office-dashboard-client";
 
-export default async function OfficePage() {
+export default async function OfficePage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
+  const resolvedSearchParams = await searchParams;
+  const dateStr = resolvedSearchParams.date;
+  
   const session = await getServerSession(authOptions);
   
   if (!session || session.user.role !== "OFFICE") {
     redirect("/login");
   }
 
-  const { dailyRecord, employees, activeSession, monthlyStats } = await getOfficeStats();
+  const { dailyRecord, employees, activeSession, monthlyStats } = await getOfficeStats(dateStr);
 
   return (
     <div className="min-h-screen bg-zinc-950 p-4 md:p-8 relative overflow-hidden">
@@ -35,6 +38,7 @@ export default async function OfficePage() {
           employees={employees} 
           activeSession={activeSession} 
           monthlyStats={monthlyStats}
+          targetDateStr={dateStr}
         />
       </div>
     </div>
