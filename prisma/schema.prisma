@@ -25,9 +25,13 @@ model User {
   username      String    @unique
   password      String    // كلمة المرور المشفرة
   role          Role      @default(EMPLOYEE)
+  isActive      Boolean   @default(true) // للأرشفة والإيقاف المؤقت
   
   // قيود الشبكة (IP Whitelisting) الخاصة بحسابات المكاتب فقط
   allowedIps    String[]  
+
+  // التوكن الخاص بآخر جلسة لضمان تسجيل الدخول من جهاز واحد
+  currentToken  String?
 
   // العلاقات: ربط الموظفين بالمكتب التابعين له
   officeId      String?
@@ -36,7 +40,6 @@ model User {
 
   // العلاقات مع الجداول الأخرى
   sessions      OfficeSession[]
-  dailyRecords  DailyRecord[]   @relation("OfficeRecords")
   employeeWorks EmployeeWork[]  @relation("EmployeeWorks")
 
   createdAt     DateTime  @default(now())
@@ -63,14 +66,12 @@ model OfficeSession {
   @@index([officeId, date])
 }
 
-// جدول إجمالي الطلبات اليومية لكل مكتب
+// جدول إجمالي الطلبات اليومية (مشترك لجميع المكاتب)
 model DailyRecord {
   id            String    @id @default(cuid())
-  officeId      String
-  office        User      @relation("OfficeRecords", fields: [officeId], references: [id], onDelete: Cascade)
   
-  date          DateTime  @default(dbgenerated("CURRENT_DATE")) @db.Date
-  totalOrders   Int       @default(0) // إجمالي الطلبات اليومية المستلمة
+  date          DateTime  @unique @default(dbgenerated("CURRENT_DATE")) @db.Date
+  totalOrders   Int       @default(0) // إجمالي الطلبات اليومية المستلمة للكل
 
   // الطلبات الموزعة على الموظفين في هذا اليوم
   employeeWorks EmployeeWork[]
@@ -78,8 +79,6 @@ model DailyRecord {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  // لا يمكن للمكتب إدخال أكثر من سجل واحد لنفس اليوم
-  @@unique([officeId, date]) 
   @@index([date])
 }
 
@@ -103,4 +102,18 @@ model EmployeeWork {
   @@unique([dailyRecordId, employeeId]) 
   @@index([employeeId])
   @@index([paymentStatus])
+}
+
+// جدول سجل التدقيق (من غيّر ماذا ومتى)
+model AuditLog {
+  id          String    @id @default(cuid())
+  actorId     String    // المستخدم الذي قام بالعملية
+  actorName   String    // اسم المستخدم
+  actorRole   String    // دوره (OFFICE / SUPER_ADMIN)
+  action      String    // اسم العملية (ASSIGN, EDIT_WORK, DELETE_WORK, TOGGLE_PAYMENT, ...)
+  description String    // وصف تفصيلي
+  createdAt   DateTime  @default(now())
+
+  @@index([actorId])
+  @@index([createdAt])
 }

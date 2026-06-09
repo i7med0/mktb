@@ -20,14 +20,23 @@ export const authOptions: NextAuthOptions = {
           where: { username: credentials.username },
         });
 
-        if (!user) {
-          throw new Error("Invalid credentials");
+        if (!user || !user.isActive) {
+          throw new Error("Invalid credentials or account disabled");
         }
 
         const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
 
         if (!isPasswordValid) {
           throw new Error("Invalid credentials");
+        }
+
+        const sessionToken = crypto.randomUUID();
+        
+        if (user.role === "OFFICE") {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { currentToken: sessionToken },
+          });
         }
 
         return {
@@ -37,18 +46,20 @@ export const authOptions: NextAuthOptions = {
           role: user.role,
           allowedIps: user.allowedIps,
           officeId: user.officeId,
+          sessionToken: user.role === "OFFICE" ? sessionToken : null,
         };
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.username = user.username;
         token.role = user.role;
         token.allowedIps = user.allowedIps;
         token.officeId = user.officeId;
+        token.sessionToken = (user as any).sessionToken;
       }
       return token;
     },
@@ -61,7 +72,8 @@ export const authOptions: NextAuthOptions = {
           role: token.role as string,
           allowedIps: token.allowedIps as string | null,
           officeId: token.officeId as string | null,
-        };
+          sessionToken: token.sessionToken as string | null,
+        } as any;
       }
       return session;
     },

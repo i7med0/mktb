@@ -11,7 +11,7 @@ export default async function OfficePage() {
     redirect("/login");
   }
 
-  const { dailyRecord, employees, activeSession } = await getOfficeStats();
+  const { dailyRecord, employees, activeSession, monthlyStats } = await getOfficeStats();
 
   return (
     <div className="min-h-screen bg-zinc-950 p-4 md:p-8 relative overflow-hidden">
@@ -34,6 +34,7 @@ export default async function OfficePage() {
           dailyRecord={dailyRecord} 
           employees={employees} 
           activeSession={activeSession} 
+          monthlyStats={monthlyStats}
         />
       </div>
     </div>

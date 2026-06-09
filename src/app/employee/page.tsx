@@ -11,7 +11,7 @@ export default async function EmployeePage() {
     redirect("/login");
   }
 
-  const { works, stats } = await getEmployeeHistory();
+  const { works, stats, monthlyWorks, monthlyStats } = await getEmployeeHistory();
 
   return (
     <div className="min-h-screen bg-zinc-950 p-4 md:p-8 relative overflow-hidden">
@@ -30,7 +30,7 @@ export default async function EmployeePage() {
           </div>
         </header>
 
-        <EmployeeDashboardClient works={works} stats={stats} />
+        <EmployeeDashboardClient works={works} stats={stats} monthlyWorks={monthlyWorks} monthlyStats={monthlyStats} />
       </div>
     </div>
   );

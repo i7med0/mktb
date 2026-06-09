@@ -5,25 +5,41 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcrypt";
+import { autoCloseStaleSessions } from "@/lib/sessions";
+import { logAction } from "@/lib/audit";
 
-export async function getSuperAdminData() {
+export async function getSuperAdminData(month?: string, year?: string) {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "SUPER_ADMIN") throw new Error("Unauthorized");
   
+  await autoCloseStaleSessions();
+
+  // If no month/year provided, default to current
+  const targetYear = year ? parseInt(year) : new Date().getFullYear();
+  const targetMonth = month ? parseInt(month) : new Date().getMonth() + 1;
+
+  const startDate = new Date(targetYear, targetMonth - 1, 1);
+  const endDate = new Date(targetYear, targetMonth, 0); // last day of month
+
   const offices = await prisma.user.findMany({
     where: { role: "OFFICE" },
     include: {
-      sessions: { orderBy: { date: 'desc' } },
-      dailyRecords: {
-        orderBy: { date: 'desc' },
-        include: {
-          employeeWorks: { include: { employee: true } }
-        }
+      sessions: { 
+        where: { date: { gte: startDate, lte: endDate } },
+        orderBy: { date: 'desc' } 
       }
     }
   });
 
-  return { offices };
+  const globalRecords = await prisma.dailyRecord.findMany({
+    where: { date: { gte: startDate, lte: endDate } },
+    orderBy: { date: 'desc' },
+    include: {
+      employeeWorks: { include: { employee: true } }
+    }
+  });
+
+  return { offices, globalRecords, targetMonth, targetYear };
 }
 
 export async function togglePaymentStatus(workId: string, currentStatus: string) {
@@ -37,7 +53,57 @@ export async function togglePaymentStatus(workId: string, currentStatus: string)
     data: { paymentStatus: newStatus }
   });
 
+  await logAction(session.user.id, session.user.name || "", "SUPER_ADMIN", "TOGGLE_PAYMENT", `تغيير حالة الدفع للعمل ${workId} إلى: ${newStatus}`);
+
   revalidatePath("/super-admin");
+}
+
+// إحصائيات مقارنة بين الموظفين
+export async function getEmployeeComparisonStats(month?: string, year?: string) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "SUPER_ADMIN") throw new Error("Unauthorized");
+
+  const targetYear = year ? parseInt(year) : new Date().getFullYear();
+  const targetMonth = month ? parseInt(month) : new Date().getMonth() + 1;
+  const startDate = new Date(targetYear, targetMonth - 1, 1);
+  const endDate = new Date(targetYear, targetMonth, 0);
+
+  const employees = await prisma.user.findMany({
+    where: { role: "EMPLOYEE" },
+    select: { id: true, name: true },
+  });
+
+  const works = await prisma.employeeWork.findMany({
+    where: {
+      dailyRecord: { date: { gte: startDate, lte: endDate } },
+    },
+    select: {
+      employeeId: true,
+      ordersCount: true,
+      paymentStatus: true,
+    },
+  });
+
+  const stats = employees.map((emp) => {
+    const empWorks = works.filter((w) => w.employeeId === emp.id);
+    const totalOrders = empWorks.reduce((acc, w) => acc + w.ordersCount, 0);
+    const paidOrders = empWorks.filter((w) => w.paymentStatus === "PAID").reduce((acc, w) => acc + w.ordersCount, 0);
+    const unpaidOrders = totalOrders - paidOrders;
+    return { id: emp.id, name: emp.name, totalOrders, paidOrders, unpaidOrders };
+  }).filter(e => e.totalOrders > 0).sort((a, b) => b.totalOrders - a.totalOrders);
+
+  return stats;
+}
+
+// سجل التدقيق
+export async function getAuditLogs(limit = 50) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "SUPER_ADMIN") throw new Error("Unauthorized");
+
+  return prisma.auditLog.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  });
 }
 
 export async function addNewOffice(formData: FormData) {
@@ -66,6 +132,50 @@ export async function addNewOffice(formData: FormData) {
       role: "OFFICE",
       allowedIps,
     }
+  });
+
+  revalidatePath("/super-admin");
+}
+
+export async function editOffice(officeId: string, formData: FormData) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "SUPER_ADMIN") throw new Error("Unauthorized");
+
+  const name = formData.get("name") as string;
+  const username = formData.get("username") as string;
+  const password = formData.get("password") as string;
+  const allowedIpsString = formData.get("allowedIps") as string;
+
+  if (!name || !username) throw new Error("Missing fields");
+
+  const allowedIps = allowedIpsString 
+    ? allowedIpsString.split(",").map(ip => ip.trim()).filter(ip => ip.length > 0)
+    : ["*"];
+
+  const updateData: any = {
+    name,
+    username,
+    allowedIps,
+  };
+
+  if (password) {
+    updateData.password = await bcrypt.hash(password, 10);
+  }
+
+  await prisma.user.update({
+    where: { id: officeId },
+    data: updateData,
+  });
+
+  revalidatePath("/super-admin");
+}
+
+export async function deleteOffice(officeId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "SUPER_ADMIN") throw new Error("Unauthorized");
+
+  await prisma.user.delete({
+    where: { id: officeId, role: "OFFICE" },
   });
 
   revalidatePath("/super-admin");

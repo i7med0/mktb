@@ -1,17 +1,20 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getSuperAdminData } from "./actions";
+import { getSuperAdminData, getEmployeeComparisonStats, getAuditLogs } from "./actions";
 import SuperAdminDashboardClient from "./super-admin-dashboard-client";
 
-export default async function SuperAdminPage() {
+export default async function SuperAdminPage({ searchParams }: { searchParams: Promise<{ month?: string, year?: string }> }) {
+  const resolvedSearchParams = await searchParams;
   const session = await getServerSession(authOptions);
   
   if (!session || session.user.role !== "SUPER_ADMIN") {
     redirect("/login");
   }
 
-  const { offices } = await getSuperAdminData();
+  const { offices, globalRecords, targetMonth, targetYear } = await getSuperAdminData(resolvedSearchParams.month, resolvedSearchParams.year);
+  const employeeStats = await getEmployeeComparisonStats(resolvedSearchParams.month, resolvedSearchParams.year);
+  const auditLogs = await getAuditLogs(30);
 
   return (
     <div className="min-h-screen bg-zinc-950 p-4 md:p-8 relative overflow-hidden">
@@ -30,7 +33,14 @@ export default async function SuperAdminPage() {
           </div>
         </header>
 
-        <SuperAdminDashboardClient offices={offices} />
+        <SuperAdminDashboardClient
+          offices={offices}
+          globalRecords={globalRecords}
+          targetMonth={targetMonth}
+          targetYear={targetYear}
+          employeeStats={employeeStats}
+          auditLogs={auditLogs}
+        />
       </div>
     </div>
   );

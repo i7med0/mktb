@@ -8,13 +8,13 @@ import { ar } from "date-fns/locale";
 export default function EmployeeDashboardClient({ works, stats }: any) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      
+
       {/* 1. Summary Stats Bento */}
       <Card className="md:col-span-3 bg-zinc-900/40 border-zinc-800/50 backdrop-blur-xl shadow-xl rounded-3xl">
         <CardContent className="p-6 md:p-8">
           <h2 className="text-xl font-bold text-white mb-6">إحصائيات آخر 30 يوماً</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            
+
             <div className="bg-zinc-800/40 p-6 rounded-2xl border border-zinc-700/50 flex items-center gap-6 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-l from-blue-500 to-transparent" />
               <div className="p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
@@ -111,7 +111,7 @@ export default function EmployeeDashboardClient({ works, stats }: any) {
           )}
         </CardContent>
       </Card>
-      
+
     </div>
   );
 }
