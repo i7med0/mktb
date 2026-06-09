@@ -139,7 +139,7 @@ export async function addNewEmployee(formData: FormData) {
 export async function startSession() {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "OFFICE") throw new Error("Unauthorized");
-  const today = getToday();
+  const today = getTargetDate();
 
   const existing = await prisma.officeSession.findFirst({
     where: { officeId: session.user.id, date: today, endTime: null }
@@ -156,7 +156,7 @@ export async function startSession() {
 export async function endSession() {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "OFFICE") throw new Error("Unauthorized");
-  const today = getToday();
+  const today = getTargetDate();
 
   const active = await prisma.officeSession.findFirst({
     where: { officeId: session.user.id, date: today, endTime: null }
