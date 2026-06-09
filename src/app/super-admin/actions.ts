@@ -12,7 +12,7 @@ export async function getSuperAdminData(month?: string, year?: string) {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "SUPER_ADMIN") throw new Error("Unauthorized");
   
-  await autoCloseStaleSessions();
+  autoCloseStaleSessions().catch(console.error);
 
   // If no month/year provided, default to current
   const targetYear = year ? parseInt(year) : new Date().getFullYear();
@@ -21,23 +21,24 @@ export async function getSuperAdminData(month?: string, year?: string) {
   const startDate = new Date(targetYear, targetMonth - 1, 1);
   const endDate = new Date(targetYear, targetMonth, 0); // last day of month
 
-  const offices = await prisma.user.findMany({
-    where: { role: "OFFICE" },
-    include: {
-      sessions: { 
-        where: { date: { gte: startDate, lte: endDate } },
-        orderBy: { date: 'desc' } 
+  const [offices, globalRecords] = await Promise.all([
+    prisma.user.findMany({
+      where: { role: "OFFICE" },
+      include: {
+        sessions: { 
+          where: { date: { gte: startDate, lte: endDate } },
+          orderBy: { date: 'desc' } 
+        }
       }
-    }
-  });
-
-  const globalRecords = await prisma.dailyRecord.findMany({
-    where: { date: { gte: startDate, lte: endDate } },
-    orderBy: { date: 'desc' },
-    include: {
-      employeeWorks: { include: { employee: true } }
-    }
-  });
+    }),
+    prisma.dailyRecord.findMany({
+      where: { date: { gte: startDate, lte: endDate } },
+      orderBy: { date: 'desc' },
+      include: {
+        employeeWorks: { include: { employee: true } }
+      }
+    })
+  ]);
 
   return { offices, globalRecords, targetMonth, targetYear };
 }
@@ -68,21 +69,22 @@ export async function getEmployeeComparisonStats(month?: string, year?: string) 
   const startDate = new Date(targetYear, targetMonth - 1, 1);
   const endDate = new Date(targetYear, targetMonth, 0);
 
-  const employees = await prisma.user.findMany({
-    where: { role: "EMPLOYEE" },
-    select: { id: true, name: true },
-  });
-
-  const works = await prisma.employeeWork.findMany({
-    where: {
-      dailyRecord: { date: { gte: startDate, lte: endDate } },
-    },
-    select: {
-      employeeId: true,
-      ordersCount: true,
-      paymentStatus: true,
-    },
-  });
+  const [employees, works] = await Promise.all([
+    prisma.user.findMany({
+      where: { role: "EMPLOYEE" },
+      select: { id: true, name: true },
+    }),
+    prisma.employeeWork.findMany({
+      where: {
+        dailyRecord: { date: { gte: startDate, lte: endDate } },
+      },
+      select: {
+        employeeId: true,
+        ordersCount: true,
+        paymentStatus: true,
+      },
+    })
+  ]);
 
   const stats = employees.map((emp) => {
     const empWorks = works.filter((w) => w.employeeId === emp.id);

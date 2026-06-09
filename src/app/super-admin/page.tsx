@@ -12,9 +12,15 @@ export default async function SuperAdminPage({ searchParams }: { searchParams: P
     redirect("/login");
   }
 
-  const { offices, globalRecords, targetMonth, targetYear } = await getSuperAdminData(resolvedSearchParams.month, resolvedSearchParams.year);
-  const employeeStats = await getEmployeeComparisonStats(resolvedSearchParams.month, resolvedSearchParams.year);
-  const auditLogs = await getAuditLogs(30);
+  const [
+    { offices, globalRecords, targetMonth, targetYear },
+    employeeStats,
+    auditLogs
+  ] = await Promise.all([
+    getSuperAdminData(resolvedSearchParams.month, resolvedSearchParams.year),
+    getEmployeeComparisonStats(resolvedSearchParams.month, resolvedSearchParams.year),
+    getAuditLogs(30)
+  ]);
 
   return (
     <div className="min-h-screen bg-zinc-950 p-4 md:p-8 relative overflow-hidden">

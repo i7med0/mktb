@@ -19,16 +19,40 @@ export async function getOfficeStats() {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "OFFICE") throw new Error("Unauthorized");
   
-  await autoCloseStaleSessions();
+  autoCloseStaleSessions().catch(console.error);
   
   const today = getToday();
   const officeId = session.user.id;
 
-  // 1. Get Daily Record
-  let dailyRecord = await prisma.dailyRecord.findUnique({
-    where: { date: today },
-    include: { employeeWorks: { include: { employee: true } } }
-  });
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+  const [employees, activeSession, monthlySessions, dailyRecordResult] = await Promise.all([
+    // 1. Get ALL active Employees for the system
+    prisma.user.findMany({
+      where: { role: "EMPLOYEE", isActive: true },
+      select: { id: true, name: true, username: true }
+    }),
+    // 2. Get Active Session if any
+    prisma.officeSession.findFirst({
+      where: { officeId, date: today, endTime: null },
+      orderBy: { startTime: 'desc' }
+    }),
+    // 3. Calculate Monthly Stats
+    prisma.officeSession.findMany({
+      where: { 
+        officeId, 
+        date: { gte: startOfMonth, lte: endOfMonth }
+      }
+    }),
+    // 4. Get Daily Record
+    prisma.dailyRecord.findUnique({
+      where: { date: today },
+      include: { employeeWorks: { include: { employee: true } } }
+    })
+  ]);
+
+  let dailyRecord = dailyRecordResult;
 
   if (!dailyRecord) {
     dailyRecord = await prisma.dailyRecord.create({
@@ -36,29 +60,6 @@ export async function getOfficeStats() {
       include: { employeeWorks: { include: { employee: true } } }
     });
   }
-
-  // 2. Get ALL active Employees for the system (Global pool)
-  const employees = await prisma.user.findMany({
-    where: { role: "EMPLOYEE", isActive: true },
-    select: { id: true, name: true, username: true }
-  });
-
-  // 3. Get Active Session if any
-  const activeSession = await prisma.officeSession.findFirst({
-    where: { officeId, date: today, endTime: null },
-    orderBy: { startTime: 'desc' }
-  });
-
-  // 4. Calculate Monthly Stats
-  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  
-  const monthlySessions = await prisma.officeSession.findMany({
-    where: { 
-      officeId, 
-      date: { gte: startOfMonth, lte: endOfMonth }
-    }
-  });
 
   const monthlyTotalMinutes = monthlySessions.reduce((acc, session) => acc + (session.durationInMin || 0), 0);
   const monthlyStats = {
