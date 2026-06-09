@@ -16,7 +16,7 @@ export function SessionValidator() {
       };
 
       validate(); // Check immediately on mount
-      const interval = setInterval(validate, 5000); // Check every 5 seconds
+      const interval = setInterval(validate, 60000); // Check every 60 seconds instead of 5
       return () => clearInterval(interval);
     }
   }, [session]);
