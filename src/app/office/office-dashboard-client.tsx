@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useTransition, useMemo } from "react";
 import { updateDailyTotal, assignOrderToEmployee, addNewEmployee, startSession, endSession, editAssignedWork, deleteAssignedWork, editEmployee, deleteEmployee } from "./actions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,18 +11,13 @@ import { Users, Package, Clock, CheckCircle2, UserPlus, CalendarDays, Edit, Tras
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 
-export default function OfficeDashboardClient({ dailyRecord, employees, activeSession, monthlyStats, targetDateStr }: any) {
-  const router = useRouter();
+export default function OfficeDashboardClient({ dailyRecord, employees, activeSession, monthlyStats }: any) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [totalOrders, setTotalOrders] = useState(dailyRecord.totalOrders);
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [ordersToAssign, setOrdersToAssign] = useState(0);
   const [employeeSearch, setEmployeeSearch] = useState("");
-
-  useEffect(() => {
-    setTotalOrders(dailyRecord.totalOrders);
-  }, [dailyRecord.totalOrders]);
 
   // حسابات يومية
   const distributedOrders = dailyRecord.employeeWorks.reduce((acc: number, work: any) => acc + work.ordersCount, 0);
@@ -43,7 +37,7 @@ export default function OfficeDashboardClient({ dailyRecord, employees, activeSe
   const handleUpdateTotal = () => {
     startTransition(async () => {
       try {
-        await updateDailyTotal(totalOrders, targetDateStr);
+        await updateDailyTotal(totalOrders);
         toast("تم تحديث العدد الإجمالي بنجاح", "success");
       } catch {
         toast("حدث خطأ أثناء التحديث", "error");
@@ -55,7 +49,7 @@ export default function OfficeDashboardClient({ dailyRecord, employees, activeSe
     if (!selectedEmployee || ordersToAssign <= 0) return;
     startTransition(async () => {
       try {
-        await assignOrderToEmployee(selectedEmployee, ordersToAssign, targetDateStr);
+        await assignOrderToEmployee(selectedEmployee, ordersToAssign);
         setOrdersToAssign(0);
         setSelectedEmployee("");
         toast("تم توزيع الطلبات بنجاح", "success");
@@ -117,24 +111,6 @@ export default function OfficeDashboardClient({ dailyRecord, employees, activeSe
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-      {/* تبديل اليوم / الأمس */}
-      <div className="md:col-span-3 flex justify-center mb-2">
-        <div className="bg-zinc-900/60 p-1.5 rounded-2xl border border-zinc-800/80 flex items-center gap-1 shadow-lg backdrop-blur-xl">
-          <button 
-            onClick={() => router.push("/office")}
-            className={`px-8 py-3 rounded-xl font-bold transition-all text-sm ${!targetDateStr || targetDateStr !== "yesterday" ? "bg-emerald-600 text-white shadow-md shadow-emerald-900/50" : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"}`}
-          >
-            بيانات اليوم
-          </button>
-          <button 
-            onClick={() => router.push("/office?date=yesterday")}
-            className={`px-8 py-3 rounded-xl font-bold transition-all text-sm ${targetDateStr === "yesterday" ? "bg-emerald-600 text-white shadow-md shadow-emerald-900/50" : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"}`}
-          >
-            بيانات الأمس
-          </button>
-        </div>
-      </div>
 
       {/* بطاقة تتبع الوقت */}
       <Card className="md:col-span-3 bg-zinc-900/40 border-zinc-800/50 backdrop-blur-xl shadow-2xl overflow-hidden rounded-3xl relative">

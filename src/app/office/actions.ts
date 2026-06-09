@@ -8,27 +8,24 @@ import bcrypt from "bcrypt";
 import { autoCloseStaleSessions } from "@/lib/sessions";
 import { logAction } from "@/lib/audit";
 
-// Helper to get target date safely (setting time to 00:00:00)
-const getTargetDate = (dateStr?: string) => {
-  const target = new Date();
-  if (dateStr === "yesterday") {
-    target.setDate(target.getDate() - 1);
-  }
-  target.setHours(0, 0, 0, 0);
-  return target;
+// Helper to get today's date safely (setting time to 00:00:00)
+const getToday = () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
 };
 
-export async function getOfficeStats(dateStr?: string) {
+export async function getOfficeStats() {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "OFFICE") throw new Error("Unauthorized");
   
   autoCloseStaleSessions().catch(console.error);
   
-  const targetDate = getTargetDate(dateStr);
+  const today = getToday();
   const officeId = session.user.id;
 
-  const startOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
-  const endOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0);
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
   const [employees, activeSession, monthlySessions, dailyRecordResult] = await Promise.all([
     // 1. Get ALL active Employees for the system
@@ -38,7 +35,7 @@ export async function getOfficeStats(dateStr?: string) {
     }),
     // 2. Get Active Session if any
     prisma.officeSession.findFirst({
-      where: { officeId, date: targetDate, endTime: null },
+      where: { officeId, date: today, endTime: null },
       orderBy: { startTime: 'desc' }
     }),
     // 3. Calculate Monthly Stats
@@ -50,7 +47,7 @@ export async function getOfficeStats(dateStr?: string) {
     }),
     // 4. Get Daily Record
     prisma.dailyRecord.findUnique({
-      where: { date: targetDate },
+      where: { date: today },
       include: { employeeWorks: { include: { employee: true } } }
     })
   ]);
@@ -59,7 +56,7 @@ export async function getOfficeStats(dateStr?: string) {
 
   if (!dailyRecord) {
     dailyRecord = await prisma.dailyRecord.create({
-      data: { date: targetDate, totalOrders: 0 },
+      data: { date: today, totalOrders: 0 },
       include: { employeeWorks: { include: { employee: true } } }
     });
   }
@@ -73,27 +70,27 @@ export async function getOfficeStats(dateStr?: string) {
   return { dailyRecord, employees, activeSession, monthlyStats };
 }
 
-export async function updateDailyTotal(totalOrders: number, dateStr?: string) {
+export async function updateDailyTotal(totalOrders: number) {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "OFFICE") throw new Error("Unauthorized");
-  const targetDate = getTargetDate(dateStr);
+  const today = getToday();
 
   await prisma.dailyRecord.upsert({
-    where: { date: targetDate },
+    where: { date: today },
     update: { totalOrders },
-    create: { date: targetDate, totalOrders },
+    create: { date: today, totalOrders },
   });
 
   revalidatePath("/office");
 }
 
-export async function assignOrderToEmployee(employeeId: string, count: number, dateStr?: string) {
+export async function assignOrderToEmployee(employeeId: string, count: number) {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "OFFICE") throw new Error("Unauthorized");
-  const targetDate = getTargetDate(dateStr);
+  const today = getToday();
 
   const dailyRecord = await prisma.dailyRecord.findUnique({
-    where: { date: targetDate }
+    where: { date: today }
   });
 
   if (!dailyRecord) throw new Error("Daily record not found");
@@ -139,7 +136,7 @@ export async function addNewEmployee(formData: FormData) {
 export async function startSession() {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "OFFICE") throw new Error("Unauthorized");
-  const today = getTargetDate();
+  const today = getToday();
 
   const existing = await prisma.officeSession.findFirst({
     where: { officeId: session.user.id, date: today, endTime: null }
@@ -156,7 +153,7 @@ export async function startSession() {
 export async function endSession() {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "OFFICE") throw new Error("Unauthorized");
-  const today = getTargetDate();
+  const today = getToday();
 
   const active = await prisma.officeSession.findFirst({
     where: { officeId: session.user.id, date: today, endTime: null }
