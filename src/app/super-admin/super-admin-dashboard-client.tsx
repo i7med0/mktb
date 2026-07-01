@@ -78,6 +78,24 @@ export default function SuperAdminDashboardClient({ offices, globalRecords, targ
   const totalMinutes = offices.reduce((sum: number, o: any) => sum + o.sessions.reduce((s: number, session: any) => s + (session.durationInMin || 0), 0), 0);
   const totalHours = Math.floor(totalMinutes / 60);
 
+  // Group sessions by day for the timeline view
+  const timeline: Record<string, { date: Date, sessions: any[] }> = {};
+  offices.forEach((office: any) => {
+    if (office.sessions) {
+      office.sessions.forEach((session: any) => {
+        const dateStr = format(new Date(session.date), 'yyyy-MM-dd');
+        if (!timeline[dateStr]) {
+          timeline[dateStr] = { date: new Date(session.date), sessions: [] };
+        }
+        timeline[dateStr].sessions.push({ ...session, officeName: office.name });
+      });
+    }
+  });
+  const dailyTimeline = Object.values(timeline).sort((a, b) => b.date.getTime() - a.date.getTime());
+  dailyTimeline.forEach(day => {
+    day.sessions.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+  });
+
   return (
     <div className="space-y-8">
       
@@ -162,50 +180,51 @@ export default function SuperAdminDashboardClient({ offices, globalRecords, targ
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-6">
-                {offices.map((office: any) => (
-                  <div key={office.id} className="bg-zinc-900/40 rounded-2xl p-4 sm:p-6 border border-zinc-800/50">
+                {dailyTimeline.length > 0 ? dailyTimeline.map((day, index) => (
+                  <div key={index} className="bg-zinc-900/40 rounded-2xl p-4 sm:p-6 border border-zinc-800/50">
                     <h3 className="text-lg font-bold text-emerald-400 mb-4 flex items-center gap-2">
-                      <Briefcase className="w-5 h-5" />
-                      {office.name}
+                      <Calendar className="w-5 h-5" />
+                      {format(day.date, 'dd MMMM yyyy', { locale: ar })}
                     </h3>
-                    {office.sessions && office.sessions.length > 0 ? (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-right">
-                          <thead className="bg-zinc-950/80 text-zinc-400 border-b border-zinc-800/50">
-                            <tr>
-                              <th className="px-4 py-3 whitespace-nowrap">التاريخ</th>
-                              <th className="px-4 py-3 whitespace-nowrap">وقت الدخول</th>
-                              <th className="px-4 py-3 whitespace-nowrap">وقت الخروج</th>
-                              <th className="px-4 py-3 whitespace-nowrap">المدة</th>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-right">
+                        <thead className="bg-zinc-950/80 text-zinc-400 border-b border-zinc-800/50">
+                          <tr>
+                            <th className="px-4 py-3 whitespace-nowrap">المكتب</th>
+                            <th className="px-4 py-3 whitespace-nowrap">وقت الدخول</th>
+                            <th className="px-4 py-3 whitespace-nowrap">وقت الخروج</th>
+                            <th className="px-4 py-3 whitespace-nowrap">المدة</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {day.sessions.map((session: any) => (
+                            <tr key={session.id} className="border-b border-zinc-800/30 hover:bg-zinc-800/20 transition-colors">
+                              <td className="px-4 py-3 whitespace-nowrap font-bold text-white flex items-center gap-2">
+                                <Briefcase className="w-4 h-4 text-zinc-500" />
+                                {session.officeName}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-blue-400" dir="ltr">{format(new Date(session.startTime), 'hh:mm a')}</td>
+                              <td className="px-4 py-3 whitespace-nowrap text-rose-400" dir="ltr">
+                                {session.endTime ? format(new Date(session.endTime), 'hh:mm a') : <span className="text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded text-xs">مستمر...</span>}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-zinc-300">
+                                {session.durationInMin ? (
+                                  <span className="font-mono bg-zinc-800 px-2 py-1 rounded">
+                                    {Math.floor(session.durationInMin / 60)}h {session.durationInMin % 60}m
+                                  </span>
+                                ) : '-'}
+                              </td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {office.sessions.map((session: any) => (
-                              <tr key={session.id} className="border-b border-zinc-800/30 hover:bg-zinc-800/20 transition-colors">
-                                <td className="px-4 py-3 whitespace-nowrap font-medium">{format(new Date(session.date), 'dd MMMM yyyy', { locale: ar })}</td>
-                                <td className="px-4 py-3 whitespace-nowrap text-blue-400" dir="ltr">{format(new Date(session.startTime), 'hh:mm a')}</td>
-                                <td className="px-4 py-3 whitespace-nowrap text-rose-400" dir="ltr">
-                                  {session.endTime ? format(new Date(session.endTime), 'hh:mm a') : <span className="text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded text-xs">مستمر...</span>}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-zinc-300">
-                                  {session.durationInMin ? (
-                                    <span className="font-mono bg-zinc-800 px-2 py-1 rounded">
-                                      {Math.floor(session.durationInMin / 60)}h {session.durationInMin % 60}m
-                                    </span>
-                                  ) : '-'}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className="text-center p-6 bg-zinc-950/30 rounded-xl border border-zinc-800/30 text-zinc-500">
-                        لا توجد جلسات عمل مسجلة لهذا المكتب في الشهر المحدد.
-                      </div>
-                    )}
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="text-center p-6 bg-zinc-950/30 rounded-xl border border-zinc-800/30 text-zinc-500">
+                    لا توجد جلسات عمل مسجلة في الشهر المحدد.
+                  </div>
+                )}
               </div>
             </DialogContent>
           </Dialog>
