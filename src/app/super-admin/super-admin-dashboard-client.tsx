@@ -79,15 +79,18 @@ export default function SuperAdminDashboardClient({ offices, globalRecords, targ
   const totalHours = Math.floor(totalMinutes / 60);
 
   // Group sessions by day for the timeline view
-  const timeline: Record<string, { date: Date, sessions: any[] }> = {};
+  const timeline: Record<string, { date: Date, sessions: any[], totalDurationInMin: number }> = {};
   offices.forEach((office: any) => {
     if (office.sessions) {
       office.sessions.forEach((session: any) => {
         const dateStr = format(new Date(session.date), 'yyyy-MM-dd');
         if (!timeline[dateStr]) {
-          timeline[dateStr] = { date: new Date(session.date), sessions: [] };
+          timeline[dateStr] = { date: new Date(session.date), sessions: [], totalDurationInMin: 0 };
         }
         timeline[dateStr].sessions.push({ ...session, officeName: office.name });
+        if (session.durationInMin) {
+          timeline[dateStr].totalDurationInMin += session.durationInMin;
+        }
       });
     }
   });
@@ -182,10 +185,15 @@ export default function SuperAdminDashboardClient({ offices, globalRecords, targ
               <div className="space-y-6">
                 {dailyTimeline.length > 0 ? dailyTimeline.map((day, index) => (
                   <div key={index} className="bg-zinc-900/40 rounded-2xl p-4 sm:p-6 border border-zinc-800/50">
-                    <h3 className="text-lg font-bold text-emerald-400 mb-4 flex items-center gap-2">
-                      <Calendar className="w-5 h-5" />
-                      {format(day.date, 'dd MMMM yyyy', { locale: ar })}
-                    </h3>
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-bold text-emerald-400 flex items-center gap-2">
+                        <Calendar className="w-5 h-5" />
+                        {format(day.date, 'dd MMMM yyyy', { locale: ar })}
+                      </h3>
+                      <span className="bg-zinc-950/50 text-zinc-300 text-sm font-bold px-3 py-1.5 rounded-xl border border-zinc-800/80 shadow-sm">
+                        إجمالي: <span className="text-emerald-400 font-mono ml-1" dir="ltr">{Math.floor(day.totalDurationInMin / 60)}h {day.totalDurationInMin % 60}m</span>
+                      </span>
+                    </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm text-right">
                         <thead className="bg-zinc-950/80 text-zinc-400 border-b border-zinc-800/50">
