@@ -1,6 +1,6 @@
 "use client";
 
-import { togglePaymentStatus, addNewOffice, editOffice, deleteOffice } from "./actions";
+import { togglePaymentStatus, addNewOffice, editOffice, deleteOffice, editOfficeSession, deleteOfficeSession } from "./actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Building2, Clock, CheckCircle2, AlertCircle, CreditCard, Users, Briefcase, Plus, ShieldCheck, Edit, Trash2, Calendar, Download, Package, BarChart2, History } from "lucide-react";
@@ -32,6 +32,17 @@ export default function SuperAdminDashboardClient({ offices, globalRecords, targ
         toast("تم حذف المكتب بنجاح", "success");
       } catch (error) {
         toast("حدث خطأ أثناء حذف المكتب", "error");
+      }
+    }
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (window.confirm("هل أنت متأكد من حذف جلسة العمل هذه؟")) {
+      try {
+        await deleteOfficeSession(sessionId);
+        toast("تم حذف الجلسة بنجاح", "success");
+      } catch (error) {
+        toast("حدث خطأ أثناء الحذف", "error");
       }
     }
   };
@@ -202,6 +213,7 @@ export default function SuperAdminDashboardClient({ offices, globalRecords, targ
                             <th className="px-4 py-3 whitespace-nowrap">وقت الدخول</th>
                             <th className="px-4 py-3 whitespace-nowrap">وقت الخروج</th>
                             <th className="px-4 py-3 whitespace-nowrap">المدة</th>
+                            <th className="px-4 py-3 whitespace-nowrap text-center">الإجراءات</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -221,6 +233,45 @@ export default function SuperAdminDashboardClient({ offices, globalRecords, targ
                                     {Math.floor(session.durationInMin / 60)}h {session.durationInMin % 60}m
                                   </span>
                                 ) : '-'}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-center">
+                                <div className="flex items-center justify-center gap-2">
+                                  <Dialog>
+                                    <DialogTrigger className="text-zinc-400 hover:text-blue-400 transition-colors bg-zinc-950 hover:bg-zinc-800 p-1.5 rounded-lg border border-zinc-800">
+                                      <Edit className="w-4 h-4" />
+                                    </DialogTrigger>
+                                    <DialogContent className="bg-zinc-950 border-zinc-800 text-white sm:max-w-md rounded-2xl shadow-2xl" dir="rtl">
+                                      <DialogHeader>
+                                        <DialogTitle className="text-xl font-bold">تعديل ساعات الدوام</DialogTitle>
+                                      </DialogHeader>
+                                      <form action={async (formData) => {
+                                        try {
+                                          await editOfficeSession(
+                                            session.id, 
+                                            formData.get("startTime") as string, 
+                                            formData.get("endTime") as string
+                                          );
+                                          toast("تم تعديل الدوام بنجاح", "success");
+                                        } catch (e) {
+                                          toast("حدث خطأ أثناء التعديل", "error");
+                                        }
+                                      }} className="space-y-4 pt-4">
+                                        <div className="space-y-2">
+                                          <Label className="text-zinc-300">وقت الدخول</Label>
+                                          <Input name="startTime" type="time" defaultValue={format(new Date(session.startTime), 'HH:mm')} className="bg-zinc-900 border-zinc-700 text-left" dir="ltr" required />
+                                        </div>
+                                        <div className="space-y-2">
+                                          <Label className="text-zinc-300">وقت الخروج</Label>
+                                          <Input name="endTime" type="time" defaultValue={session.endTime ? format(new Date(session.endTime), 'HH:mm') : ''} className="bg-zinc-900 border-zinc-700 text-left" dir="ltr" />
+                                        </div>
+                                        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold">حفظ التعديلات</Button>
+                                      </form>
+                                    </DialogContent>
+                                  </Dialog>
+                                  <button onClick={() => handleDeleteSession(session.id)} className="text-zinc-400 hover:text-rose-400 transition-colors bg-zinc-950 hover:bg-zinc-800 p-1.5 rounded-lg border border-zinc-800">
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}

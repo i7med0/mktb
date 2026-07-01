@@ -182,3 +182,56 @@ export async function deleteOffice(officeId: string) {
 
   revalidatePath("/super-admin");
 }
+
+export async function editOfficeSession(sessionId: string, newStartTime: string, newEndTime: string) {
+  const sessionUser = await getServerSession(authOptions);
+  if (!sessionUser || sessionUser.user.role !== "SUPER_ADMIN") throw new Error("Unauthorized");
+
+  const session = await prisma.officeSession.findUnique({ where: { id: sessionId }, include: { office: true } });
+  if (!session) throw new Error("Session not found");
+
+  const baseStart = new Date(session.startTime);
+  const [startH, startM] = newStartTime.split(':').map(Number);
+  const updatedStartTime = new Date(baseStart);
+  updatedStartTime.setHours(startH, startM, 0, 0);
+
+  let updatedEndTime = null;
+  let durationInMin = null;
+
+  if (newEndTime) {
+     const [endH, endM] = newEndTime.split(':').map(Number);
+     updatedEndTime = new Date(baseStart);
+     updatedEndTime.setHours(endH, endM, 0, 0);
+     
+     if (updatedEndTime < updatedStartTime) {
+       // if end time is conceptually on the next day
+       updatedEndTime.setDate(updatedEndTime.getDate() + 1);
+     }
+     durationInMin = Math.round((updatedEndTime.getTime() - updatedStartTime.getTime()) / 60000);
+  }
+
+  await prisma.officeSession.update({
+    where: { id: sessionId },
+    data: {
+      startTime: updatedStartTime,
+      endTime: updatedEndTime,
+      durationInMin,
+    }
+  });
+
+  await logAction(sessionUser.user.id, sessionUser.user.name || "", "SUPER_ADMIN", "EDIT_SESSION", `تعديل ساعات الدوام لمكتب ${session.office.name}`);
+  revalidatePath("/super-admin");
+}
+
+export async function deleteOfficeSession(sessionId: string) {
+  const sessionUser = await getServerSession(authOptions);
+  if (!sessionUser || sessionUser.user.role !== "SUPER_ADMIN") throw new Error("Unauthorized");
+
+  const session = await prisma.officeSession.findUnique({ where: { id: sessionId }, include: { office: true } });
+  if (session) {
+    await prisma.officeSession.delete({ where: { id: sessionId } });
+    await logAction(sessionUser.user.id, sessionUser.user.name || "", "SUPER_ADMIN", "DELETE_SESSION", `حذف جلسة عمل لمكتب ${session.office.name}`);
+  }
+
+  revalidatePath("/super-admin");
+}
