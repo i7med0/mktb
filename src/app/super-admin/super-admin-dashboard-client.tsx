@@ -147,9 +147,73 @@ export default function SuperAdminDashboardClient({ offices, globalRecords, targ
             })}
           </select>
         </div>
-        <Button onClick={exportToCSV} className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl gap-2 font-bold h-10 px-6">
-          <Download className="w-4 h-4" /> تصدير التقرير (CSV)
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Dialog>
+            <DialogTrigger className="inline-flex items-center justify-center bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl gap-2 font-bold h-10 px-4 sm:px-6 transition-colors">
+              <Clock className="w-4 h-4" /> تفاصيل دوام المكاتب
+            </DialogTrigger>
+            <DialogContent className="bg-zinc-950 border-zinc-800 text-white sm:max-w-3xl rounded-2xl shadow-2xl max-h-[85vh] overflow-y-auto" dir="rtl">
+              <DialogHeader>
+                <DialogTitle className="text-xl sm:text-2xl font-bold mb-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  تفاصيل دوام المكاتب - {format(new Date(targetYear, targetMonth - 1), 'MMMM yyyy', { locale: ar })}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-6">
+                {offices.map((office: any) => (
+                  <div key={office.id} className="bg-zinc-900/40 rounded-2xl p-4 sm:p-6 border border-zinc-800/50">
+                    <h3 className="text-lg font-bold text-emerald-400 mb-4 flex items-center gap-2">
+                      <Briefcase className="w-5 h-5" />
+                      {office.name}
+                    </h3>
+                    {office.sessions && office.sessions.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-right">
+                          <thead className="bg-zinc-950/80 text-zinc-400 border-b border-zinc-800/50">
+                            <tr>
+                              <th className="px-4 py-3 whitespace-nowrap">التاريخ</th>
+                              <th className="px-4 py-3 whitespace-nowrap">وقت الدخول</th>
+                              <th className="px-4 py-3 whitespace-nowrap">وقت الخروج</th>
+                              <th className="px-4 py-3 whitespace-nowrap">المدة</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {office.sessions.map((session: any) => (
+                              <tr key={session.id} className="border-b border-zinc-800/30 hover:bg-zinc-800/20 transition-colors">
+                                <td className="px-4 py-3 whitespace-nowrap font-medium">{format(new Date(session.date), 'dd MMMM yyyy', { locale: ar })}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-blue-400" dir="ltr">{format(new Date(session.startTime), 'hh:mm a')}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-rose-400" dir="ltr">
+                                  {session.endTime ? format(new Date(session.endTime), 'hh:mm a') : <span className="text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded text-xs">مستمر...</span>}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-zinc-300">
+                                  {session.durationInMin ? (
+                                    <span className="font-mono bg-zinc-800 px-2 py-1 rounded">
+                                      {Math.floor(session.durationInMin / 60)}h {session.durationInMin % 60}m
+                                    </span>
+                                  ) : '-'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="text-center p-6 bg-zinc-950/30 rounded-xl border border-zinc-800/30 text-zinc-500">
+                        لا توجد جلسات عمل مسجلة لهذا المكتب في الشهر المحدد.
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Button onClick={exportToCSV} className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl gap-2 font-bold h-10 px-4 sm:px-6">
+            <Download className="w-4 h-4" /> تصدير التقرير
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
