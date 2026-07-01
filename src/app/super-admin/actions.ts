@@ -235,3 +235,51 @@ export async function deleteOfficeSession(sessionId: string) {
 
   revalidatePath("/super-admin");
 }
+
+export async function addOfficeSession(formData: FormData) {
+  const sessionUser = await getServerSession(authOptions);
+  if (!sessionUser || sessionUser.user.role !== "SUPER_ADMIN") throw new Error("Unauthorized");
+
+  const officeId = formData.get("officeId") as string;
+  const targetDateStr = formData.get("date") as string;
+  const newStartTime = formData.get("startTime") as string;
+  const newEndTime = formData.get("endTime") as string;
+
+  if (!officeId || !targetDateStr || !newStartTime) throw new Error("Missing fields");
+
+  const office = await prisma.user.findUnique({ where: { id: officeId } });
+  if (!office) throw new Error("Office not found");
+
+  const [year, month, day] = targetDateStr.split('-').map(Number);
+  
+  const updatedStartTime = new Date(year, month - 1, day);
+  const [startH, startM] = newStartTime.split(':').map(Number);
+  updatedStartTime.setHours(startH, startM, 0, 0);
+
+  let updatedEndTime = null;
+  let durationInMin = null;
+
+  if (newEndTime) {
+     const [endH, endM] = newEndTime.split(':').map(Number);
+     updatedEndTime = new Date(year, month - 1, day);
+     updatedEndTime.setHours(endH, endM, 0, 0);
+     
+     if (updatedEndTime < updatedStartTime) {
+       updatedEndTime.setDate(updatedEndTime.getDate() + 1);
+     }
+     durationInMin = Math.round((updatedEndTime.getTime() - updatedStartTime.getTime()) / 60000);
+  }
+
+  await prisma.officeSession.create({
+    data: {
+      officeId,
+      date: new Date(year, month - 1, day, 12, 0, 0), // Use noon to avoid timezone shift dropping it to previous day if stored in UTC
+      startTime: updatedStartTime,
+      endTime: updatedEndTime,
+      durationInMin,
+    }
+  });
+
+  await logAction(sessionUser.user.id, sessionUser.user.name || "", "SUPER_ADMIN", "ADD_SESSION", `إضافة جلسة عمل لمكتب ${office.name}`);
+  revalidatePath("/super-admin");
+}

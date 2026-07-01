@@ -1,6 +1,6 @@
 "use client";
 
-import { togglePaymentStatus, addNewOffice, editOffice, deleteOffice, editOfficeSession, deleteOfficeSession } from "./actions";
+import { togglePaymentStatus, addNewOffice, editOffice, deleteOffice, editOfficeSession, deleteOfficeSession, addOfficeSession } from "./actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Building2, Clock, CheckCircle2, AlertCircle, CreditCard, Users, Briefcase, Plus, ShieldCheck, Edit, Trash2, Calendar, Download, Package, BarChart2, History } from "lucide-react";
@@ -186,12 +186,55 @@ export default function SuperAdminDashboardClient({ offices, globalRecords, targ
             </DialogTrigger>
             <DialogContent className="bg-zinc-950 border-zinc-800 text-white sm:max-w-3xl rounded-2xl shadow-2xl max-h-[85vh] overflow-y-auto" dir="rtl">
               <DialogHeader>
-                <DialogTitle className="text-xl sm:text-2xl font-bold mb-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                    <Clock className="w-5 h-5 text-emerald-400" />
-                  </div>
-                  تفاصيل دوام المكاتب - {format(new Date(targetYear, targetMonth - 1), 'MMMM yyyy', { locale: ar })}
-                </DialogTitle>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                  <DialogTitle className="text-xl sm:text-2xl font-bold flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                      <Clock className="w-5 h-5 text-emerald-400" />
+                    </div>
+                    تفاصيل دوام المكاتب - {format(new Date(targetYear, targetMonth - 1), 'MMMM yyyy', { locale: ar })}
+                  </DialogTitle>
+                  <Dialog>
+                    <DialogTrigger className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 text-white rounded-xl gap-2 font-bold h-10 px-4 transition-colors">
+                      <Plus className="w-4 h-4" /> إضافة دوام يدوي
+                    </DialogTrigger>
+                    <DialogContent className="bg-zinc-950 border-zinc-800 text-white sm:max-w-md rounded-2xl shadow-2xl" dir="rtl">
+                      <DialogHeader>
+                        <DialogTitle className="text-xl font-bold">إضافة ساعات عمل يدوياً</DialogTitle>
+                      </DialogHeader>
+                      <form action={async (formData) => {
+                         try {
+                           await addOfficeSession(formData);
+                           toast("تم إضافة الدوام بنجاح", "success");
+                         } catch(e) {
+                           toast("حدث خطأ أثناء الإضافة", "error");
+                         }
+                      }} className="space-y-4 pt-4">
+                        <div className="space-y-2">
+                          <Label className="text-zinc-300">المكتب</Label>
+                          <select name="officeId" className="w-full bg-zinc-900 border border-zinc-700 h-10 rounded-xl text-white outline-none px-3" required>
+                            <option value="">اختر المكتب...</option>
+                            {offices.map((o: any) => (
+                              <option key={o.id} value={o.id}>{o.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-zinc-300">التاريخ</Label>
+                          <Input name="date" type="date" required className="bg-zinc-900 border-zinc-700 text-left" dir="ltr" defaultValue={format(new Date(), 'yyyy-MM-dd')} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-zinc-300">وقت الدخول</Label>
+                          <Input name="startTime" type="time" required className="bg-zinc-900 border-zinc-700 text-left" dir="ltr" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-zinc-300">وقت الخروج (اختياري)</Label>
+                          <Input name="endTime" type="time" className="bg-zinc-900 border-zinc-700 text-left" dir="ltr" />
+                        </div>
+                        <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold">إضافة الدوام</Button>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </DialogHeader>
               <div className="space-y-6">
                 {dailyTimeline.length > 0 ? dailyTimeline.map((day, index) => (
